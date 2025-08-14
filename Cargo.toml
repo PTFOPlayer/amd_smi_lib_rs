@@ -7,5 +7,5 @@ authors = ["WhiskyAKM"]
 description = "bindings for amd_smi"
 
 [dependencies]
-amd_smi_lib_sys = "*"
+amd_smi_lib_sys = "0.1.0"
 bitflags = "2.9.1"
