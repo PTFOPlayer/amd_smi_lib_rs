@@ -7,6 +7,9 @@ use bitflags::bitflags;
 
 use crate::error::{AmdSmiError, IntoAmdSmiResult};
 pub mod error;
+pub mod discovery;
+pub mod handles;
+pub mod util;
 
 bitflags! {
    pub struct InitFlags: u32 {
@@ -65,6 +68,6 @@ mod tests {
 
     #[test]
     pub fn main_test() {
-        unsafe { AmdSmi::init_gpu().unwrap() };
+        AmdSmi::init_gpu().unwrap();
     }
 }
