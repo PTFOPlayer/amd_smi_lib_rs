@@ -1,0 +1,1 @@
+# AMD_SMI_LIB_RS

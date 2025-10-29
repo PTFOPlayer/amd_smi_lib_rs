@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "amd_smi_lib_rs"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "amd_smi_lib_sys",
  "bitflags",
@@ -21,9 +21,9 @@ dependencies = [
 
 [[package]]
 name = "amd_smi_lib_sys"
-version = "0.1.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97908713acf76a90d5a252e3733c985c3a0d6fb610a0b5c2dfe18fd0d071e8a5"
+checksum = "6643032dd7f6a001904187f85d97c3a124b74d4236de51a56c2dfaba80b6e1ce"
 dependencies = [
  "bindgen",
 ]

@@ -1,13 +1,13 @@
 use amd_smi_lib_sys::bindings::{
     self, amdsmi_init_flags_t_AMDSMI_INIT_AMD_APUS, amdsmi_init_flags_t_AMDSMI_INIT_AMD_CPUS,
     amdsmi_init_flags_t_AMDSMI_INIT_AMD_GPUS, amdsmi_init_flags_t_AMDSMI_INIT_NON_AMD_CPUS,
-    amdsmi_init_flags_t_AMDSMI_INIT_NON_AMD_GPUS
+    amdsmi_init_flags_t_AMDSMI_INIT_NON_AMD_GPUS,
 };
 use bitflags::bitflags;
 
 use crate::error::{AmdSmiError, IntoAmdSmiResult};
-pub mod error;
 pub mod discovery;
+pub mod error;
 pub mod handles;
 pub mod util;
 

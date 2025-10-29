@@ -2,9 +2,8 @@ use crate::util::StringCleanup;
 use std::ptr::null_mut;
 
 use amd_smi_lib_sys::bindings::{
-    AMDSMI_GPU_UUID_SIZE, amdsmi_bdf_t, amdsmi_enumeration_info_t, amdsmi_get_gpu_device_bdf,
-    amdsmi_get_gpu_device_uuid, amdsmi_get_gpu_enumeration_info,
-    amdsmi_get_gpu_virtualization_mode, amdsmi_get_processor_handles, amdsmi_get_processor_type,
+    AMDSMI_GPU_UUID_SIZE, amdsmi_bdf_t, amdsmi_get_gpu_device_bdf, amdsmi_get_gpu_device_uuid,
+    amdsmi_get_processor_handles, amdsmi_get_processor_info, amdsmi_get_processor_type,
     amdsmi_get_socket_handles, amdsmi_get_socket_info,
 };
 
@@ -17,17 +16,8 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum ProcessorType {
     Unknown,
-    AmdGpu {
-        bdf: BDF,
-        uuid: String,
-        drm_render: u32,
-        drm_card: u32,
-        hsa_id: u32,
-        hip_id: u32,
-        hip_uuid: String,
-        virtualization_mode: VirtualizationMode
-    },
-    AmdCpu,
+    AmdGpu { bdf: BDF, uuid: String },
+    AmdCpu { name: String },
     NonAmdGpu,
     NonAmdCpu,
     AmdCpuCore,
@@ -74,18 +64,18 @@ impl AmdSmi {
 
         let mut sockets = vec![];
 
-        let mut raw_name = vec![0i8; 256];
+        let mut name = String::from_utf8(vec![0; 256]).unwrap();
         for socket in socket_handles {
             unsafe {
-                amdsmi_get_socket_info(socket, 256, raw_name.as_mut_ptr()).into_amd_smi_result()?;
+                amdsmi_get_socket_info(socket, 256, name.as_mut_ptr().cast())
+                    .into_amd_smi_result()?;
             }
 
-            let name = String::from_utf8(raw_name.iter().map(|i| i.cast_unsigned()).collect())
-                .map_err(|_| AmdSmiError::AmdsmiStatusUnexpectedData)?
-                .string_cleanup();
-
             let processors = Self::get_processors_info(socket)?;
-            sockets.push(SocketInfo { name, processors });
+            sockets.push(SocketInfo {
+                name: name.clone().string_cleanup(),
+                processors,
+            });
         }
 
         Ok(sockets)
@@ -119,7 +109,7 @@ impl AmdSmi {
             let processor_type = match processor_type {
                 0 => Ok(ProcessorType::Unknown),
                 1 => Ok(Self::get_gpu_info(processor_handle)?),
-                2 => Ok(ProcessorType::AmdCpu),
+                2 => Ok(Self::get_cpu_info(processor_handle)?),
                 3 => Ok(ProcessorType::NonAmdGpu),
                 4 => Ok(ProcessorType::NonAmdCpu),
                 5 => Ok(ProcessorType::AmdCpuCore),
@@ -139,10 +129,6 @@ impl AmdSmi {
         let mut uuid_length = AMDSMI_GPU_UUID_SIZE;
         let mut uuid = String::from_utf8(vec![0; AMDSMI_GPU_UUID_SIZE as usize]).unwrap();
 
-        let mut enumeration_info: amdsmi_enumeration_info_t = unsafe { std::mem::zeroed() };
-
-        let mut virtualization_mode: VirtualizationMode = VirtualizationMode::Unknown;
-
         unsafe {
             amdsmi_get_gpu_device_bdf(
                 processor_handle,
@@ -156,15 +142,6 @@ impl AmdSmi {
                 uuid.as_mut_ptr().cast(),
             )
             .into_amd_smi_result()?;
-
-            amdsmi_get_gpu_enumeration_info(processor_handle, &mut enumeration_info)
-                .into_amd_smi_result()?;
-
-            amdsmi_get_gpu_virtualization_mode(
-                processor_handle,
-                (&mut virtualization_mode as *mut VirtualizationMode).cast(),
-            )
-            .into_amd_smi_result()?;
         }
 
         Ok(ProcessorType::AmdGpu {
@@ -175,20 +152,18 @@ impl AmdSmi {
                 domain_number: (bdf >> 16) & 0xFFFF_FFFF_FFFF, // 48 bits
             },
             uuid: uuid.string_cleanup(),
-            drm_render: enumeration_info.drm_render,
-            drm_card: enumeration_info.drm_card,
-            hsa_id: enumeration_info.hsa_id,
-            hip_id: enumeration_info.hip_id,
-            hip_uuid: String::from_utf8_lossy(
-                &enumeration_info
-                    .hip_uuid
-                    .iter()
-                    .map(|i| i.cast_unsigned())
-                    .collect::<Vec<_>>(),
-            )
-            .string_cleanup(),
-            virtualization_mode,
         })
+    }
+
+    fn get_cpu_info(processor_handle: ProcessorHandle) -> Result<ProcessorType, AmdSmiError> {
+        let mut name = String::from_utf8(vec![0; 256]).unwrap();
+        unsafe {
+            amdsmi_get_processor_info(processor_handle, 256, name.as_mut_ptr().cast())
+                .into_amd_smi_result()?;
+        }
+        name = name.string_cleanup();
+
+        Ok(ProcessorType::AmdCpu { name })
     }
 }
 
