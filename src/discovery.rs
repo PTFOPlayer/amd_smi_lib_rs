@@ -2,9 +2,7 @@ use crate::util::StringCleanup;
 use std::ptr::null_mut;
 
 use amd_smi_lib_sys::bindings::{
-    AMDSMI_GPU_UUID_SIZE, amdsmi_bdf_t, amdsmi_get_gpu_device_bdf, amdsmi_get_gpu_device_uuid,
-    amdsmi_get_processor_handles, amdsmi_get_processor_info, amdsmi_get_processor_type,
-    amdsmi_get_socket_handles, amdsmi_get_socket_info,
+    AMDSMI_GPU_UUID_SIZE, AMDSMI_MAX_STRING_LENGTH, amdsmi_bdf_t, amdsmi_get_gpu_device_bdf, amdsmi_get_gpu_device_uuid, amdsmi_get_gpu_id, amdsmi_get_gpu_revision, amdsmi_get_gpu_subsystem_id, amdsmi_get_gpu_subsystem_name, amdsmi_get_gpu_vendor_name, amdsmi_get_processor_handles, amdsmi_get_processor_info, amdsmi_get_processor_type, amdsmi_get_socket_handles, amdsmi_get_socket_info
 };
 
 use crate::{
@@ -16,8 +14,18 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum ProcessorType {
     Unknown,
-    AmdGpu { bdf: BDF, uuid: String },
-    AmdCpu { name: String },
+    AmdGpu {
+        bdf: BDF,
+        uuid: String,
+        id: u16,
+        revision: u16,
+        vendor_name: String,
+        subsystem_id: u16,  
+        subsystem_name: String,
+    },
+    AmdCpu {
+        name: String,
+    },
     NonAmdGpu,
     NonAmdCpu,
     AmdCpuCore,
@@ -128,6 +136,13 @@ impl AmdSmi {
 
         let mut uuid_length = AMDSMI_GPU_UUID_SIZE;
         let mut uuid = String::from_utf8(vec![0; AMDSMI_GPU_UUID_SIZE as usize]).unwrap();
+        let mut id = 0u16;
+        let mut revision = 0u16;
+        let mut vendor_name =
+            String::from_utf8(vec![0; AMDSMI_MAX_STRING_LENGTH as usize]).unwrap();
+        let mut subsystem_id = 0u16;
+        let mut subsystem_name =
+            String::from_utf8(vec![0; AMDSMI_MAX_STRING_LENGTH as usize]).unwrap();
 
         unsafe {
             amdsmi_get_gpu_device_bdf(
@@ -142,6 +157,27 @@ impl AmdSmi {
                 uuid.as_mut_ptr().cast(),
             )
             .into_amd_smi_result()?;
+
+            amdsmi_get_gpu_id(processor_handle, &mut id).into_amd_smi_result()?;
+
+            amdsmi_get_gpu_revision(processor_handle, &mut revision).into_amd_smi_result()?;
+
+            amdsmi_get_gpu_vendor_name(
+                processor_handle,
+                vendor_name.as_mut_ptr().cast(),
+                AMDSMI_MAX_STRING_LENGTH as usize,
+            )
+            .into_amd_smi_result()?;
+
+            amdsmi_get_gpu_subsystem_id(processor_handle, &mut subsystem_id)
+                .into_amd_smi_result()?;
+
+            amdsmi_get_gpu_subsystem_name(
+                processor_handle,
+                subsystem_name.as_mut_ptr().cast(),
+                AMDSMI_MAX_STRING_LENGTH as usize,
+            )
+            .into_amd_smi_result()?;
         }
 
         Ok(ProcessorType::AmdGpu {
@@ -152,11 +188,17 @@ impl AmdSmi {
                 domain_number: (bdf >> 16) & 0xFFFF_FFFF_FFFF, // 48 bits
             },
             uuid: uuid.string_cleanup(),
+            id,
+            revision,
+            vendor_name: vendor_name.string_cleanup(),
+            subsystem_id,
+            subsystem_name: subsystem_name.string_cleanup(),
         })
     }
 
     fn get_cpu_info(processor_handle: ProcessorHandle) -> Result<ProcessorType, AmdSmiError> {
         let mut name = String::from_utf8(vec![0; 256]).unwrap();
+
         unsafe {
             amdsmi_get_processor_info(processor_handle, 256, name.as_mut_ptr().cast())
                 .into_amd_smi_result()?;
@@ -172,10 +214,27 @@ mod discovery_tests {
     use crate::{AmdSmi, error::AmdSmiError};
 
     #[test]
-    fn test_socket_info() -> Result<(), AmdSmiError> {
-        let mut amdsmi = AmdSmi::init_gpu()?;
+    fn test_discovery() -> Result<(), AmdSmiError> {
+        // scoping to ensure amdsmi is shutdown before re-initializing
 
-        println!("{:?}", amdsmi.get_sockets_info()?);
+        let cpu_count = {
+            let mut amdsmi = AmdSmi::init_cpu()?;
+            amdsmi.get_sockets_info()?.len()
+        };
+
+        let gpu_count = {
+            let mut amdsmi = AmdSmi::init_gpu()?;
+            amdsmi.get_sockets_info()?.len()
+        };
+
+        let total = {
+            let mut amdsmi = AmdSmi::init_all()?;
+            amdsmi.get_sockets_info()?
+        };
+
+        println!("{:?}", total);
+
+        assert_eq!(total.len(), cpu_count + gpu_count);
         Ok(())
     }
 }

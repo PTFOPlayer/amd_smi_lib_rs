@@ -12,6 +12,7 @@ pub mod handles;
 pub mod util;
 
 bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
    pub struct InitFlags: u32 {
         const CPU = amdsmi_init_flags_t_AMDSMI_INIT_AMD_CPUS;
         const GPU = amdsmi_init_flags_t_AMDSMI_INIT_AMD_GPUS;
@@ -50,6 +51,29 @@ impl AmdSmi {
     /// This function will return an error if initialization is not possible.
     pub fn init_gpu() -> Result<Self, AmdSmiError> {
         unsafe { Self::with_flags(InitFlags::GPU) }
+    }
+
+    /// Initializes AMDSMI only for cpu functions.
+    /// # Errors
+    ///
+    /// This function will return an error if initialization is not possible.
+    pub fn init_cpu() -> Result<Self, AmdSmiError> {
+        unsafe { Self::with_flags(InitFlags::CPU) }
+    }
+
+    pub fn init_apu() -> Result<Self, AmdSmiError> {
+        unsafe { Self::with_flags(InitFlags::APU) }
+    }
+
+    /// Initializes AMDSMI for both cpu and gpu functions.
+    /// # Errors
+    /// This function will return an error if initialization is not possible.
+    pub fn init_all() -> Result<Self, AmdSmiError> {
+        unsafe { Self::with_flags(InitFlags::CPU | InitFlags::GPU | InitFlags::APU) }
+    }
+
+    pub fn get_flags(&self) -> InitFlags {
+        self.mode
     }
 }
 

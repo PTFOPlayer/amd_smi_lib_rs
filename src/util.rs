@@ -4,12 +4,12 @@ pub(crate) trait StringCleanup {
 
 impl StringCleanup for String {
     fn string_cleanup(self) -> String {
-        self.trim().trim_end_matches("\0").to_string()
+        self.trim_end_matches("\0").trim().to_string()
     }
 }
 
 impl StringCleanup for &str {
     fn string_cleanup(self) -> String {
-        self.trim().trim_end_matches("\0").to_string()
+        self.trim_end_matches("\0").trim().to_string()
     }
 }
